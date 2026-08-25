@@ -2,7 +2,7 @@ name: Keep Render alive
 
 on:
   schedule:
-    - cron: '*/14 * * * *'   # every 14 minutes
+    - cron: '0 * * * *'   # every hour (was every 14 min - reduced to save Neon data transfer quota)
   workflow_dispatch:
 
 jobs:

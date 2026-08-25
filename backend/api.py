@@ -112,6 +112,7 @@ app.mount("/mock-fw", mock_fw_app)
 
 @app.get("/health", tags=["Health"])
 async def health():
+    """Lightweight health check - no database queries."""
     return {"status": "ok"}
 
 
@@ -147,13 +148,14 @@ async def root() -> Dict[str, Any]:
     }
 
 
-@app.get("/health", tags=["Health"])
-async def health_check() -> Dict[str, str]:
+@app.get("/health/db", tags=["Health"])
+async def health_check_db() -> Dict[str, str]:
     """
-    Health check endpoint.
-    
+    Database health check endpoint. More expensive than /health.
+    Use this for monitoring, not for keep-alive pings.
+
     Returns:
-        Service health status
+        Service health status with database connectivity
     """
     try:
         # Check if database tables exist
@@ -162,12 +164,12 @@ async def health_check() -> Dict[str, str]:
             table_exists("weekly_kpis"),
             table_exists("monthly_kpis")
         ])
-        
+
         if tables_ok:
             return {"status": "healthy", "database": "connected"}
         else:
             return {"status": "degraded", "database": "missing tables"}
-            
+
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
 

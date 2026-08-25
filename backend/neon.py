@@ -21,11 +21,29 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is not set. Add it to .env")
 
-_pool = psycopg2.pool.ThreadedConnectionPool(
-    2, 10,  # min 2, max 10 connections
-    DATABASE_URL,
-    cursor_factory=psycopg2.extras.RealDictCursor,
-)
+# Lazy-initialized connection pool (created on first use)
+_pool = None
+
+
+def _get_pool():
+    """Get or create the connection pool. Lazy initialization prevents startup crashes."""
+    global _pool
+    if _pool is None:
+        try:
+            _pool = psycopg2.pool.ThreadedConnectionPool(
+                2, 10,  # min 2, max 10 connections
+                DATABASE_URL,
+                cursor_factory=psycopg2.extras.RealDictCursor,
+            )
+        except psycopg2.OperationalError as e:
+            # More helpful error message for quota issues
+            if "exceeded the data transfer quota" in str(e):
+                raise RuntimeError(
+                    "Neon database has exceeded data transfer quota. "
+                    "Check your Neon dashboard and consider upgrading your plan or waiting for quota reset."
+                ) from e
+            raise
+    return _pool
 
 
 class _PooledConnection:
@@ -39,7 +57,7 @@ class _PooledConnection:
                 self._conn.rollback()  # clean state before returning
         except Exception:
             pass
-        _pool.putconn(self._conn)
+        _get_pool().putconn(self._conn)
 
     def __getattr__(self, name):
         return getattr(self._conn, name)
@@ -47,13 +65,14 @@ class _PooledConnection:
 
 def _get_live_conn():
     """Get a connection from the pool, replacing it if Neon has closed it."""
-    conn = _pool.getconn()
+    pool = _get_pool()
+    conn = pool.getconn()
     try:
         conn.cursor().execute("SELECT 1")
     except Exception:
         # Stale connection — discard and open a fresh one
         try:
-            _pool.putconn(conn, close=True)
+            pool.putconn(conn, close=True)
         except Exception:
             pass
         conn = psycopg2.connect(
@@ -91,4 +110,4 @@ def get_db():
             conn.rollback()  # ensure clean state
         except Exception:
             pass
-        _pool.putconn(conn)
+        _get_pool().putconn(conn)
