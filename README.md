@@ -1,6 +1,8 @@
 # TrueSignal — Predictive Maintenance Intelligence
 
-Maintenance teams lose hours every week chasing false alarms and reacting to unexpected failures. TrueSignal connects to FaciliWorks, analyzes work order history, and tells you which assets are going to fail — before they do.
+Maintenance teams lose hours every week chasing false alarms and reacting to unexpected failures. TrueSignal connects to your CMMS, analyzes work order history, and scores equipment failure risk and suggests preventive-maintenance schedules.
+
+I designed the architecture and product and directed Claude Code to implement it.
 
 **[→ Try the live demo](https://truesignalapp.com)** — no sign-up required
 
@@ -18,10 +20,12 @@ Most CMMS tools are good at recording what happened. None of them tell you what'
 
 ## What TrueSignal Does
 
-- **Failure predictions** — Every asset scored CRITICAL / HIGH / MEDIUM / LOW with estimated days to failure
+- **Failure predictions** — Rules-based failure risk scoring (time between failures, recent reactive work, PM gaps) with CRITICAL/HIGH/MEDIUM/LOW levels and a confidence score showing how much history supports each prediction
+- **CMMS adapters** — CMMS adapters for FaciliWorks (tested end to end against a mock server built from its API docs) and MaintainX
 - **PM optimization** — Identifies over- and under-maintained assets, generates adjusted PM schedules
 - **KPI intelligence** — Strips out rushed completions and data quality distortions to show real metrics
 - **AI insights** — Plain-language summaries of what's happening across your fleet
+- **Next phase** — Replace the heuristic scoring with a trained model
 
 ---
 
@@ -109,7 +113,7 @@ FastAPI (Render)
     └── /mock-fw      Mock FaciliWorks API (replicates real API contract)
     ↓
 Neon PostgreSQL
-    ├── orgs / locations / users  (multi-tenant, all data scoped to location_id)
+    ├── orgs / locations / users  (multi-tenant, all data scoped to location_id; AES-256 encrypted API keys)
     ├── asset_failure_predictions
     ├── pm_optimization_suggestions
     └── work_orders / kpi_daily / kpi_weekly
