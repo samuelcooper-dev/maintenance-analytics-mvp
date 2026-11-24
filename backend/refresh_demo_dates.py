@@ -89,6 +89,20 @@ def refresh_demo_dates() -> dict:
         results["maintenance_insights"] = cur.rowcount
 
         logger.info(f"Demo dates refreshed successfully: {results}")
+
+        # Recalculate KPIs from the updated work orders
+        try:
+            from .pipeline import run_pipeline
+            logger.info(f"Running pipeline to recalculate KPIs for location_id={DEMO_LOCATION_ID}")
+            pipeline_result = run_pipeline(verbose=False, location_id=DEMO_LOCATION_ID)
+            results["kpis_recalculated"] = True
+            results["pipeline"] = pipeline_result
+            logger.info(f"Pipeline completed: {pipeline_result}")
+        except Exception as pipeline_error:
+            logger.error(f"Pipeline failed after date refresh: {pipeline_error}", exc_info=True)
+            results["kpis_recalculated"] = False
+            results["pipeline_error"] = str(pipeline_error)
+
         return results
     except Exception as e:
         logger.error(f"Failed to refresh demo dates: {e}", exc_info=True)
