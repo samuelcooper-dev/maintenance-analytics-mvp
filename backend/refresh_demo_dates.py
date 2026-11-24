@@ -47,48 +47,51 @@ def refresh_demo_dates() -> dict:
         today = date.today()
         shift_days = (today - max_date).days
 
-        if shift_days <= 0:
-            return {"status": "skipped", "reason": f"data already current (max date: {max_date})"}
+        results = {"status": "ok" if shift_days > 0 else "dates_current", "shift_days": shift_days, "max_was": str(max_date), "today": str(today)}
 
-        results = {"status": "ok", "shift_days": shift_days, "max_was": str(max_date), "today": str(today)}
+        # Only shift dates if needed
+        if shift_days > 0:
+            logger.info(f"Shifting dates forward by {shift_days} days")
 
-        # work_orders — 5 date columns, all nullable
-        cur.execute("""
-            UPDATE work_orders SET
-                creation_date   = CASE WHEN creation_date   IS NOT NULL THEN creation_date   + make_interval(days => %s) END,
-                scheduled_start = CASE WHEN scheduled_start IS NOT NULL THEN scheduled_start + make_interval(days => %s) END,
-                start_date      = CASE WHEN start_date      IS NOT NULL THEN start_date      + make_interval(days => %s) END,
-                completion_date = CASE WHEN completion_date IS NOT NULL THEN completion_date + make_interval(days => %s) END,
-                due_date        = CASE WHEN due_date        IS NOT NULL THEN due_date        + make_interval(days => %s) END
-            WHERE location_id = %s
-        """, (shift_days, shift_days, shift_days, shift_days, shift_days, DEMO_LOCATION_ID))
-        results["work_orders"] = cur.rowcount
+            # work_orders — 5 date columns, all nullable
+            cur.execute("""
+                UPDATE work_orders SET
+                    creation_date   = CASE WHEN creation_date   IS NOT NULL THEN creation_date   + make_interval(days => %s) END,
+                    scheduled_start = CASE WHEN scheduled_start IS NOT NULL THEN scheduled_start + make_interval(days => %s) END,
+                    start_date      = CASE WHEN start_date      IS NOT NULL THEN start_date      + make_interval(days => %s) END,
+                    completion_date = CASE WHEN completion_date IS NOT NULL THEN completion_date + make_interval(days => %s) END,
+                    due_date        = CASE WHEN due_date        IS NOT NULL THEN due_date        + make_interval(days => %s) END
+                WHERE location_id = %s
+            """, (shift_days, shift_days, shift_days, shift_days, shift_days, DEMO_LOCATION_ID))
+            results["work_orders"] = cur.rowcount
 
-        # asset_failure_predictions
-        cur.execute("""
-            UPDATE asset_failure_predictions
-            SET prediction_date = prediction_date + make_interval(days => %s)
-            WHERE location_id = %s
-        """, (shift_days, DEMO_LOCATION_ID))
-        results["asset_failure_predictions"] = cur.rowcount
+            # asset_failure_predictions
+            cur.execute("""
+                UPDATE asset_failure_predictions
+                SET prediction_date = prediction_date + make_interval(days => %s)
+                WHERE location_id = %s
+            """, (shift_days, DEMO_LOCATION_ID))
+            results["asset_failure_predictions"] = cur.rowcount
 
-        # pm_optimization_suggestions
-        cur.execute("""
-            UPDATE pm_optimization_suggestions
-            SET suggestion_date = suggestion_date + make_interval(days => %s)
-            WHERE location_id = %s
-        """, (shift_days, DEMO_LOCATION_ID))
-        results["pm_optimization_suggestions"] = cur.rowcount
+            # pm_optimization_suggestions
+            cur.execute("""
+                UPDATE pm_optimization_suggestions
+                SET suggestion_date = suggestion_date + make_interval(days => %s)
+                WHERE location_id = %s
+            """, (shift_days, DEMO_LOCATION_ID))
+            results["pm_optimization_suggestions"] = cur.rowcount
 
-        # maintenance_insights
-        cur.execute("""
-            UPDATE maintenance_insights
-            SET insight_date = insight_date + make_interval(days => %s)
-            WHERE location_id = %s
-        """, (shift_days, DEMO_LOCATION_ID))
-        results["maintenance_insights"] = cur.rowcount
+            # maintenance_insights
+            cur.execute("""
+                UPDATE maintenance_insights
+                SET insight_date = insight_date + make_interval(days => %s)
+                WHERE location_id = %s
+            """, (shift_days, DEMO_LOCATION_ID))
+            results["maintenance_insights"] = cur.rowcount
 
-        logger.info(f"Demo dates refreshed successfully: {results}")
+            logger.info(f"Demo dates refreshed successfully: {results}")
+        else:
+            logger.info(f"Dates already current (max: {max_date}), skipping date updates")
 
         # Recalculate KPIs from the updated work orders
         try:
