@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useEffect } from 'react';
+import { useState, lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Nav from './components/Nav';
@@ -125,15 +125,18 @@ function AutoDemoRoute({ children }) {
   const { user, loading, loginAsDemo } = useAuth();
   const [demoLoading, setDemoLoading] = useState(false);
   const navigate = useNavigate();
+  const hasAttemptedLogin = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user && !demoLoading) {
+    if (!loading && !user && !demoLoading && !hasAttemptedLogin.current) {
+      hasAttemptedLogin.current = true;
       setDemoLoading(true);
       loginAsDemo()
         .then(() => {
           setDemoLoading(false);
         })
         .catch(() => {
+          setDemoLoading(false);
           // If demo login fails, redirect to landing
           navigate('/');
         });
