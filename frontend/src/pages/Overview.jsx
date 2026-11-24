@@ -324,7 +324,8 @@ export default function Overview({ dateRange }) {
       const results = await Promise.all([
         getPredictions.dashboard(),
         getKPIs.daily({ limit: 100, ...timeParams, ...locParam }),
-        getPredictions.failures({ limit: 1000, ...timeParams, ...locParam }),
+        // Don't filter predictions by time - always show current fleet status
+        getPredictions.failures({ limit: 1000, ...locParam }),
         getWorkOrders.recent({ limit: 8, ...locParam }),
         getWorkOrders.stats({ ...locParam }),
       ]);
