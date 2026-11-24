@@ -79,7 +79,33 @@ def log_step(step_name: str, status: str = "START", details: str = "") -> None:
     print(message)
 
 
-def load_data() -> pd.DataFrame:
+def load_data_from_db(location_id: Optional[int] = None) -> pd.DataFrame:
+    """
+    Load work orders from database for KPI recalculation.
+
+    Args:
+        location_id: Filter by location ID, or None for all locations
+
+    Returns:
+        DataFrame with work orders from database
+    """
+    from .neon import get_conn
+
+    conn = get_conn()
+    try:
+        query = "SELECT * FROM work_orders"
+        params = ()
+        if location_id is not None:
+            query += " WHERE location_id = %s"
+            params = (location_id,)
+
+        df = pd.read_sql_query(query, conn, params=params)
+        return df
+    finally:
+        conn.close()
+
+
+def load_data(location_id: Optional[int] = None) -> pd.DataFrame:
     """
     Load and prepare work order data.
 
@@ -92,9 +118,18 @@ def load_data() -> pd.DataFrame:
     log_step("LOAD DATA", "START")
 
     if load_and_prepare_data is None:
-        log_step("LOAD DATA", "INFO", "Data loading not available (demo mode)")
-        # Return empty DataFrame - pipeline will work with existing database data
-        return pd.DataFrame()
+        log_step("LOAD DATA", "INFO", "Loading from database (demo mode)")
+        # Load work orders from database instead
+        try:
+            df = load_data_from_db(location_id)
+            if df.empty:
+                log_step("LOAD DATA", "INFO", "No work orders found in database")
+                return pd.DataFrame()
+            log_step("LOAD DATA", "SUCCESS", f"Loaded {len(df)} work orders from database")
+            return df
+        except Exception as e:
+            log_step("LOAD DATA", "ERROR", str(e))
+            raise PipelineError(f"Database load failed: {str(e)}")
 
     try:
         df = load_and_prepare_data()
@@ -367,7 +402,7 @@ def run_pipeline(verbose: bool = True, location_id: Optional[int] = 1) -> dict:
         setup_database()
 
         # Stage 2: Load data
-        df = load_data()
+        df = load_data(location_id=location_id)
         results['work_orders_processed'] = len(df)
 
         # Only run KPI calculation and predictions if we have data
