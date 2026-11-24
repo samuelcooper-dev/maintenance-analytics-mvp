@@ -65,17 +65,17 @@ def log_step(step_name: str, status: str = "START", details: str = "") -> None:
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     symbols = {
-        "START": "▶",
-        "SUCCESS": "✓",
-        "ERROR": "✗",
-        "INFO": "ℹ"
+        "START": ">",
+        "SUCCESS": "+",
+        "ERROR": "X",
+        "INFO": "i"
     }
-    symbol = symbols.get(status, "•")
-    
+    symbol = symbols.get(status, "*")
+
     message = f"[{timestamp}] {symbol} {step_name}"
     if details:
         message += f": {details}"
-    
+
     print(message)
 
 
