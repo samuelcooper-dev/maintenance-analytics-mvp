@@ -4,9 +4,9 @@ Maintenance teams lose hours every week chasing false alarms and reacting to une
 
 I designed the architecture and product and directed Claude Code to implement it.
 
-**[→ Try the live demo](https://truesignalapp.com)** — no sign-up required
+**[→ Try the live demo](https://truesignalapp.com)** — opens directly in demo mode
 
-> **Note:** The backend runs on Render's free tier, which spins down after 15 minutes of inactivity. The first request after a period of inactivity may take 20–30 seconds to respond. Subsequent requests are fast.
+> **Note:** This is a portfolio demo showcasing the full architecture and predictive maintenance pipeline. All visitors automatically see the same demo account with pre-populated hospital CMMS data. The backend runs on Render's free tier, which spins down after 15 minutes of inactivity—the first request may take 20-30 seconds to wake up.
 
 ---
 
@@ -29,11 +29,11 @@ Most CMMS tools are good at recording what happened. None of them tell you what'
 
 ---
 
-## How It Works — From Onboarding to Insights
+## How It Works — Demo Walkthrough
 
-### 1. Connect FaciliWorks
+### 1. Connect to Mock CMMS
 
-After signing in, you're prompted to connect your FaciliWorks instance. Enter your site's base URL and API key — TrueSignal stores the key encrypted at rest and immediately runs an initial sync.
+The demo connects to a mock FaciliWorks server built to match the real API spec. The mock generates 29 hospital assets and ~250 work orders with realistic maintenance patterns. All demo data is refreshed weekly via GitHub Actions to stay current.
 
 [![Connect FaciliWorks](docs/screenshots/connect.png)](https://truesignalapp.com)
 
@@ -74,16 +74,16 @@ Rather than requiring a live FaciliWorks license to run the app, we built a mock
 - `GET /v1/pm` — returns preventive maintenance work orders
 - `POST /v1/cm` — creates a new work order (used by the PM push feature)
 
-The mock generates realistic hospital CMMS data deterministically (`random.seed(42)`) — the same 29 assets and ~250 work orders every time, so test results are reproducible. It's mounted on the production backend at `/mock-fw`, which means anyone can connect to it to test the full pipeline end-to-end without a FaciliWorks account.
+The mock generates realistic hospital CMMS data deterministically (`random.seed(42)`) — the same 29 assets and ~250 work orders every time, so test results are reproducible. It's mounted on the production backend at `/mock-fw`.
 
-**To test it yourself:** sign up for a free account, go to Settings, and enter:
+**Live demo details:**
+- Everyone sees the same demo account (read-only mode)
+- Pre-connected to the mock FaciliWorks server at `/mock-fw`
+- Real sync pipeline runs against deterministic mock data
+- Full prediction and analytics pipeline demonstrated
+- Data refreshed weekly via GitHub Actions to stay current
 
-| Field | Value |
-|---|---|
-| Base URL | `https://maintenance-analytics-mvp.onrender.com/mock-fw` |
-| API Key | `demo-key` |
-
-This runs a real sync and prediction pipeline against mock data — you'll see the full onboarding flow, not a pre-loaded state.
+The demo showcases the complete architecture without requiring a real CMMS license.
 
 ---
 

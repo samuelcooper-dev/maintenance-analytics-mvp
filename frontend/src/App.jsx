@@ -1,24 +1,18 @@
-import { useState, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useState, lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Nav from './components/Nav';
 import Landing from './pages/Landing';
-import Login from './pages/Login';
 import Overview from './pages/Overview';
 import SupportChat from './components/SupportChat';
 import OnboardingBanner from './components/OnboardingBanner';
 import TrialBanner from './components/TrialBanner';
 import './App.css';
 
-const Signup          = lazy(() => import('./pages/Signup'));
 const AssetHealth     = lazy(() => import('./pages/AssetHealth'));
 const PMPlanner       = lazy(() => import('./pages/PMPlanner'));
 const Help            = lazy(() => import('./pages/Help'));
 const Settings        = lazy(() => import('./pages/Settings'));
-const VerifyEmail     = lazy(() => import('./pages/VerifyEmail'));
-const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
-const ResetPassword   = lazy(() => import('./pages/ResetPassword'));
-const Pricing         = lazy(() => import('./pages/Pricing'));
 const Upgrade         = lazy(() => import('./pages/Upgrade'));
 
 function PageFallback() {
@@ -126,18 +120,38 @@ function Header({ dateRange, setDateRange }) {
   );
 }
 
-// Redirects to /login if not authenticated
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-      <div className="text-slate-400 animate-pulse">Loading…</div>
-    </div>
-  );
-  return user ? children : <Navigate to="/login" replace />;
+// Auto-login as demo if not authenticated
+function AutoDemoRoute({ children }) {
+  const { user, loading, loginAsDemo } = useAuth();
+  const [demoLoading, setDemoLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user && !demoLoading) {
+      setDemoLoading(true);
+      loginAsDemo()
+        .then(() => {
+          setDemoLoading(false);
+        })
+        .catch(() => {
+          // If demo login fails, redirect to landing
+          navigate('/');
+        });
+    }
+  }, [loading, user, demoLoading, loginAsDemo, navigate]);
+
+  if (loading || (!user && demoLoading)) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400 animate-pulse">Loading demo...</div>
+      </div>
+    );
+  }
+
+  return user ? children : null;
 }
 
-// Redirects viewers (and unauthenticated users) away from settings
+// Settings requires owner/admin role (but everyone is auto-logged in as demo)
 function OwnerAdminRoute({ children }) {
   const { user, loading, isOwnerOrAdmin } = useAuth();
   if (loading) return (
@@ -145,7 +159,7 @@ function OwnerAdminRoute({ children }) {
       <div className="text-slate-400 animate-pulse">Loading…</div>
     </div>
   );
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (!isOwnerOrAdmin) return <Navigate to="/dashboard/" replace />;
   return children;
 }
@@ -183,17 +197,11 @@ export default function App() {
       <AuthProvider>
         <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
           <Routes>
-            <Route path="/"        element={<Landing />} />
-            <Route path="/login"        element={<Login />} />
-            <Route path="/signup"       element={<Signup />} />
-            <Route path="/verify-email"    element={<VerifyEmail />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password"  element={<ResetPassword />} />
-            <Route path="/pricing"      element={<Pricing />} />
+            <Route path="/" element={<Landing />} />
             <Route path="/dashboard/*" element={
-              <ProtectedRoute>
+              <AutoDemoRoute>
                 <Dashboard />
-              </ProtectedRoute>
+              </AutoDemoRoute>
             } />
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />

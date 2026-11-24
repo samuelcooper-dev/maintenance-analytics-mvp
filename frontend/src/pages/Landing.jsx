@@ -317,7 +317,7 @@ function Logo() {
 }
 
 export default function Landing() {
-  const { loginAsDemo } = useAuth();
+  const { loginAsDemo, user } = useAuth();
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoSlow, setDemoSlow]       = useState(false);
@@ -328,6 +328,13 @@ export default function Landing() {
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
   }, []);
+
+  // If already logged in, redirect to dashboard
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard/');
+    }
+  }, [user, navigate]);
 
   const handleDemo = async () => {
     setDemoLoading(true);

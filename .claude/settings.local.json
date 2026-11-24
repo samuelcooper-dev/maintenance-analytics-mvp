@@ -39,7 +39,16 @@
       "Bash(/c/Users/sampc/AppData/Local/Programs/Python/Python313/python.exe:*)",
       "Bash(start:*)",
       "Bash(py:*)",
-      "Bash(pip freeze:*)"
+      "Bash(pip freeze:*)",
+      "Bash(nslookup:*)",
+      "Bash(pg_dump:*)",
+      "Bash(pg_isready:*)",
+      "Bash(psql:*)",
+      "Bash(PGPASSWORD=\"\" psql:*)",
+      "Bash(net:*)",
+      "Bash(pg_ctl reload:*)",
+      "Bash(pg_restore:*)",
+      "Bash(done)"
     ]
   }
 }

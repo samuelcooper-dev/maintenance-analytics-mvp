@@ -18,12 +18,14 @@ Usage: python -m backend.refresh_demo_dates
 import os
 from datetime import date
 from .neon import get_db
+from .logger import logger
 
 DEMO_LOCATION_ID = int(os.environ.get("DEMO_LOCATION_ID", "3"))
 
 
 def refresh_demo_dates() -> dict:
-    with get_db() as conn:
+    try:
+        with get_db() as conn:
         cur = conn.cursor()
 
         # Determine the shift: today minus the latest date in the demo work orders
@@ -86,7 +88,11 @@ def refresh_demo_dates() -> dict:
         """, (shift_days, DEMO_LOCATION_ID))
         results["maintenance_insights"] = cur.rowcount
 
+        logger.info(f"Demo dates refreshed successfully: {results}")
         return results
+    except Exception as e:
+        logger.error(f"Failed to refresh demo dates: {e}", exc_info=True)
+        return {"status": "error", "message": str(e)}
 
 
 if __name__ == "__main__":
