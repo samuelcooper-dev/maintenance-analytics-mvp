@@ -8,6 +8,7 @@ Set RESEND_API_KEY and EMAIL_FROM in .env.
 import os
 import resend
 from dotenv import load_dotenv
+from .logger import logger
 
 load_dotenv()
 
@@ -20,7 +21,7 @@ APP_URL = os.environ.get("APP_URL", "http://localhost:5173")
 def _send(to: str, subject: str, html: str) -> bool:
     """Send an email. Returns True on success, False on failure."""
     if not resend.api_key:
-        print(f"[email] RESEND_API_KEY not set — skipping email to {to}")
+        logger.warning(f"RESEND_API_KEY not set - skipping email to {to}")
         return False
     try:
         resend.Emails.send({
@@ -29,9 +30,10 @@ def _send(to: str, subject: str, html: str) -> bool:
             "subject": subject,
             "html": html,
         })
+        logger.info(f"Email sent successfully to {to}: {subject}")
         return True
     except Exception as e:
-        print(f"[email] Failed to send to {to}: {e}")
+        logger.error(f"Failed to send email to {to}: {e}")
         return False
 
 
@@ -158,3 +160,8 @@ def send_welcome_email(to: str, name: str) -> bool:
       </a>
     """
     return _send(to, f"Welcome to {APP_NAME}", _base_template(content))
+
+
+def send_email(to: str, subject: str, html: str) -> bool:
+    """General purpose email send function."""
+    return _send(to, subject, html)

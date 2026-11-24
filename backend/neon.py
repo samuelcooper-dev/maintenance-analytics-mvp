@@ -55,7 +55,8 @@ class _PooledConnection:
         try:
             if not self._conn.closed:
                 self._conn.rollback()  # clean state before returning
-        except Exception:
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            # Connection already closed or invalid - safe to ignore
             pass
         _get_pool().putconn(self._conn)
 
@@ -69,11 +70,12 @@ def _get_live_conn():
     conn = pool.getconn()
     try:
         conn.cursor().execute("SELECT 1")
-    except Exception:
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
         # Stale connection — discard and open a fresh one
         try:
             pool.putconn(conn, close=True)
-        except Exception:
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            # Already closed, safe to ignore
             pass
         conn = psycopg2.connect(
             DATABASE_URL,
@@ -108,6 +110,7 @@ def get_db():
     finally:
         try:
             conn.rollback()  # ensure clean state
-        except Exception:
+        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+            # Connection already closed, safe to ignore
             pass
         _get_pool().putconn(conn)

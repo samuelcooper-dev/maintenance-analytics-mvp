@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 
 from .encryption import decrypt
 from .neon import get_conn
+from .logger import logger
 
 # ── Status / priority mappings ──────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ def _get(url: str, api_key: str, retries: int = 3):
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 wait = 10 * (attempt + 1)
-                print(f"  Rate limited — waiting {wait}s...")
+                logger.warning(f"FaciliWorks rate limited - waiting {wait}s (attempt {attempt+1}/{retries})")
                 time.sleep(wait)
             elif e.code == 401:
                 raise RuntimeError("Invalid API key — FaciliWorks returned 401 Unauthorized.")
@@ -194,7 +195,8 @@ def _epoch_to_date(epoch) -> str | None:
         return None
     try:
         return datetime.fromtimestamp(int(epoch), tz=timezone.utc).strftime("%Y-%m-%d")
-    except Exception:
+    except (ValueError, TypeError, OSError):
+        # Invalid epoch value, None, or out of range
         return None
 
 
@@ -366,26 +368,26 @@ def mark_implemented_suggestions(location_id: int = 1) -> int:
 # ── Main sync ─────────────────────────────────────────────────────────────────
 
 def sync(location_id=None) -> tuple[int, int]:
-    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting FaciliWorks sync...")
+    logger.info(f"Starting FaciliWorks sync for location_id={location_id}")
     base_url, api_key = get_credentials(location_id)
 
-    print(f"  Base URL: {base_url}")
+    logger.info(f"FaciliWorks Base URL: {base_url}")
 
     # Fetch assets
-    print("  Fetching assets...")
+    logger.info("Fetching assets from FaciliWorks...")
     fw_assets = fetch_all_fw("v1/assets", api_key, base_url)
-    print(f"  -> {len(fw_assets)} assets found")
+    logger.info(f"Found {len(fw_assets)} assets")
     asset_map = build_asset_map(fw_assets)
 
     # Fetch corrective maintenance (CMs)
-    print("  Fetching corrective maintenance (CM)...")
+    logger.info("Fetching corrective maintenance (CM)...")
     cms = fetch_all_fw("v1/cm", api_key, base_url)
-    print(f"  -> {len(cms)} CM records found")
+    logger.info(f"Found {len(cms)} CM records")
 
     # Fetch preventive maintenance (PMs)
-    print("  Fetching preventive maintenance (PM)...")
+    logger.info("Fetching preventive maintenance (PM)...")
     pms = fetch_all_fw("v1/pm", api_key, base_url)
-    print(f"  -> {len(pms)} PM records found")
+    logger.info(f"Found {len(pms)} PM records")
 
     # Map to internal schema
     rows = []
@@ -404,15 +406,14 @@ def sync(location_id=None) -> tuple[int, int]:
             skipped += 1
 
     if skipped:
-        print(f"  -> {skipped} records skipped (no linked asset or missing ID)")
+        logger.warning(f"Skipped {skipped} records (no linked asset or missing ID)")
 
     # Deduplicate by work_order_id (last write wins — shouldn't happen but safe)
     deduped = {r["work_order_id"]: r for r in rows}
     rows = list(deduped.values())
 
     inserted, updated = upsert_work_orders(rows, location_id or 1)
-    print(f"  -> {inserted} inserted, {updated} updated in TrueSignal DB")
-    print("Sync complete.")
+    logger.info(f"Sync complete: {inserted} inserted, {updated} updated in TrueSignal DB")
     return inserted, updated
 
 

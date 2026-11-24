@@ -955,7 +955,7 @@ def _generate_xlsx(sections: List[str], days: Optional[int], location_id: int) -
             "x_scale": 0.9, "y_scale": 0.9,
             "object_position": 1,
         })
-    except Exception:
+    except (IOError, ValueError, RuntimeError):
         pass  # logo is cosmetic, don't fail report
 
     ROW = 5  # current write position

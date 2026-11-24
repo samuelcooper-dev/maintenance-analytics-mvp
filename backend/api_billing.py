@@ -89,26 +89,21 @@ def billing_status(user_id: int = Depends(_current_user_id)):
 @router.post("/upgrade")
 def upgrade(body: UpgradeRequest, user_id: int = Depends(_current_user_id)):
     """
-    Stub — will call Stripe Checkout / Subscription API here.
-    For now: if a stripe_payment_method_id is not provided, return a 501.
+    Upgrade endpoint — Stripe integration coming soon.
+    Returns friendly message instead of 501 error.
     """
-    if not body.stripe_payment_method_id:
-        raise HTTPException(501, "Stripe not yet integrated — provide stripe_payment_method_id")
-
     org_id = _get_org_id(user_id)
     if body.plan not in ("pro", "enterprise"):
         raise HTTPException(400, "plan must be 'pro' or 'enterprise'")
 
-    # TODO: create Stripe customer + subscription, store IDs
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE orgs SET plan = %s, extra_seats = %s
-        WHERE id = %s
-    """, (body.plan, body.extra_seats, org_id))
-    conn.commit()
-    conn.close()
-    return {"success": True, "plan": body.plan}
+    # Payment integration coming soon - for now return helpful message
+    raise HTTPException(
+        503,
+        detail={
+            "message": "Payment processing is coming soon! For now, please contact us at sales@truesignalapp.com to upgrade your account.",
+            "contact_email": "sales@truesignalapp.com"
+        }
+    )
 
 
 @router.post("/apply-promo")
@@ -159,6 +154,33 @@ def apply_promo(body: PromoRequest, user_id: int = Depends(_current_user_id)):
 
 @router.post("/contact-enterprise")
 def contact_enterprise(user_id: int = Depends(_current_user_id)):
-    """Stub — will send an email to sales team."""
-    # TODO: send email to sales@truesignalapp.com via Resend
+    """Contact enterprise sales - sends notification email."""
+    from .email_service import send_email
+
+    # Get user info for context
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT u.email, u.name, o.name as org_name
+        FROM users u
+        JOIN orgs o ON u.org_id = o.id
+        WHERE u.id = %s
+    """, (user_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if row:
+        # Send notification email to sales (will gracefully skip if RESEND_API_KEY not set)
+        send_email(
+            to="sales@truesignalapp.com",
+            subject="Enterprise Contact Request - TrueSignal",
+            html=f"""
+            <h2>New Enterprise Contact Request</h2>
+            <p><strong>Name:</strong> {row['name']}</p>
+            <p><strong>Email:</strong> {row['email']}</p>
+            <p><strong>Organization:</strong> {row['org_name']}</p>
+            <p><strong>Request Time:</strong> {datetime.now(timezone.utc).isoformat()}</p>
+            """
+        )
+
     return {"success": True, "message": "Thanks! Our team will reach out within 1 business day."}

@@ -47,6 +47,19 @@ export default function Login() {
     }
   };
 
+  const tryDemo = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await login('demo@truesignalapp.com', 'demo123');
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Demo login temporarily unavailable. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -93,6 +106,26 @@ export default function Login() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
+
+          <div className="mt-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-700/50"></div>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-2 bg-slate-900 text-slate-500">or</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={tryDemo}
+              disabled={loading}
+              className="w-full mt-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg text-sm transition-colors border border-slate-700"
+            >
+              Try the Demo
+            </button>
+          </div>
 
           <div className="flex items-center justify-between mt-6">
             <p className="text-xs text-slate-500">

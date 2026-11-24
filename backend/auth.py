@@ -19,6 +19,16 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "truesignal-dev-secret-change-in-prod"
 ALGORITHM  = "HS256"
 TOKEN_EXPIRE_DAYS = 7
 
+# Validate secret key on import (fail fast in production)
+if SECRET_KEY == "truesignal-dev-secret-change-in-prod":
+    # Check if we're in production (DATABASE_URL contains neon.tech)
+    db_url = os.environ.get("DATABASE_URL", "")
+    if "neon.tech" in db_url or os.environ.get("RENDER") or os.environ.get("VERCEL"):
+        raise RuntimeError(
+            "CRITICAL: SECRET_KEY is using default dev value in production! "
+            "Set a secure SECRET_KEY environment variable (32+ random characters)."
+        )
+
 
 # -- DB setup -----------------------------------------------------------------
 

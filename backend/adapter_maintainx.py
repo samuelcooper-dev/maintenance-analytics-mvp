@@ -180,7 +180,8 @@ def _parse_date(value):
         return None
     try:
         return value[:10]  # take YYYY-MM-DD from ISO string
-    except Exception:
+    except (TypeError, IndexError):
+        # None or non-string value
         return None
 
 

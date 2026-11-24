@@ -20,6 +20,16 @@ _DEV_FALLBACK = "dev-only-insecure-key-change-now!"  # exactly 32 chars
 
 def _master_key() -> bytes:
     raw = os.environ.get(_ENV_VAR, _DEV_FALLBACK)
+
+    # Validate in production
+    if raw == _DEV_FALLBACK:
+        db_url = os.environ.get("DATABASE_URL", "")
+        if "neon.tech" in db_url or os.environ.get("RENDER") or os.environ.get("VERCEL"):
+            raise RuntimeError(
+                "CRITICAL: TRUESIGNAL_MASTER_KEY is using default dev value in production! "
+                "Set a secure TRUESIGNAL_MASTER_KEY environment variable (32+ random characters)."
+            )
+
     # Pad or truncate to exactly 32 bytes
     return raw.encode()[:32].ljust(32, b"\x00")
 
