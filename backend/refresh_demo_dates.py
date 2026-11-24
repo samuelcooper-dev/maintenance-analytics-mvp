@@ -26,87 +26,87 @@ DEMO_LOCATION_ID = int(os.environ.get("DEMO_LOCATION_ID", "3"))
 def refresh_demo_dates() -> dict:
     try:
         with get_db() as conn:
-        cur = conn.cursor()
+            cur = conn.cursor()
 
-        # Determine the shift: today minus the latest date in the demo work orders
-        cur.execute("""
-            SELECT MAX(GREATEST(
-                COALESCE(creation_date,   '2000-01-01'::date),
-                COALESCE(completion_date, '2000-01-01'::date),
-                COALESCE(due_date,        '2000-01-01'::date)
-            )) AS max_date
-            FROM work_orders
-            WHERE location_id = %s
-        """, (DEMO_LOCATION_ID,))
-        row = cur.fetchone()
-        max_date = row['max_date'] if row else None
-
-        if not max_date:
-            return {"status": "skipped", "reason": "no work orders found for demo location"}
-
-        today = date.today()
-        shift_days = (today - max_date).days
-
-        results = {"status": "ok" if shift_days > 0 else "dates_current", "shift_days": shift_days, "max_was": str(max_date), "today": str(today)}
-
-        # Only shift dates if needed
-        if shift_days > 0:
-            logger.info(f"Shifting dates forward by {shift_days} days")
-
-            # work_orders — 5 date columns, all nullable
+            # Determine the shift: today minus the latest date in the demo work orders
             cur.execute("""
-                UPDATE work_orders SET
-                    creation_date   = CASE WHEN creation_date   IS NOT NULL THEN creation_date   + make_interval(days => %s) END,
-                    scheduled_start = CASE WHEN scheduled_start IS NOT NULL THEN scheduled_start + make_interval(days => %s) END,
-                    start_date      = CASE WHEN start_date      IS NOT NULL THEN start_date      + make_interval(days => %s) END,
-                    completion_date = CASE WHEN completion_date IS NOT NULL THEN completion_date + make_interval(days => %s) END,
-                    due_date        = CASE WHEN due_date        IS NOT NULL THEN due_date        + make_interval(days => %s) END
+                SELECT MAX(GREATEST(
+                    COALESCE(creation_date,   '2000-01-01'::date),
+                    COALESCE(completion_date, '2000-01-01'::date),
+                    COALESCE(due_date,        '2000-01-01'::date)
+                )) AS max_date
+                FROM work_orders
                 WHERE location_id = %s
-            """, (shift_days, shift_days, shift_days, shift_days, shift_days, DEMO_LOCATION_ID))
-            results["work_orders"] = cur.rowcount
+            """, (DEMO_LOCATION_ID,))
+            row = cur.fetchone()
+            max_date = row['max_date'] if row else None
 
-            # asset_failure_predictions
-            cur.execute("""
-                UPDATE asset_failure_predictions
-                SET prediction_date = prediction_date + make_interval(days => %s)
-                WHERE location_id = %s
-            """, (shift_days, DEMO_LOCATION_ID))
-            results["asset_failure_predictions"] = cur.rowcount
+            if not max_date:
+                return {"status": "skipped", "reason": "no work orders found for demo location"}
 
-            # pm_optimization_suggestions
-            cur.execute("""
-                UPDATE pm_optimization_suggestions
-                SET suggestion_date = suggestion_date + make_interval(days => %s)
-                WHERE location_id = %s
-            """, (shift_days, DEMO_LOCATION_ID))
-            results["pm_optimization_suggestions"] = cur.rowcount
+            today = date.today()
+            shift_days = (today - max_date).days
 
-            # maintenance_insights
-            cur.execute("""
-                UPDATE maintenance_insights
-                SET insight_date = insight_date + make_interval(days => %s)
-                WHERE location_id = %s
-            """, (shift_days, DEMO_LOCATION_ID))
-            results["maintenance_insights"] = cur.rowcount
+            results = {"status": "ok" if shift_days > 0 else "dates_current", "shift_days": shift_days, "max_was": str(max_date), "today": str(today)}
 
-            logger.info(f"Demo dates refreshed successfully: {results}")
-        else:
-            logger.info(f"Dates already current (max: {max_date}), skipping date updates")
+            # Only shift dates if needed
+            if shift_days > 0:
+                logger.info(f"Shifting dates forward by {shift_days} days")
 
-        # Recalculate KPIs from the updated work orders
-        try:
-            from .pipeline import run_pipeline
-            logger.info(f"Running pipeline to recalculate KPIs for location_id={DEMO_LOCATION_ID}")
-            pipeline_result = run_pipeline(verbose=False, location_id=DEMO_LOCATION_ID)
-            results["kpis_recalculated"] = True
-            results["pipeline"] = pipeline_result
-            logger.info(f"Pipeline completed: {pipeline_result}")
-        except Exception as pipeline_error:
-            logger.error(f"Pipeline failed after date refresh: {pipeline_error}", exc_info=True)
-            results["kpis_recalculated"] = False
-            results["pipeline_error"] = str(pipeline_error)
+                # work_orders — 5 date columns, all nullable
+                cur.execute("""
+                    UPDATE work_orders SET
+                        creation_date   = CASE WHEN creation_date   IS NOT NULL THEN creation_date   + make_interval(days => %s) END,
+                        scheduled_start = CASE WHEN scheduled_start IS NOT NULL THEN scheduled_start + make_interval(days => %s) END,
+                        start_date      = CASE WHEN start_date      IS NOT NULL THEN start_date      + make_interval(days => %s) END,
+                        completion_date = CASE WHEN completion_date IS NOT NULL THEN completion_date + make_interval(days => %s) END,
+                        due_date        = CASE WHEN due_date        IS NOT NULL THEN due_date        + make_interval(days => %s) END
+                    WHERE location_id = %s
+                """, (shift_days, shift_days, shift_days, shift_days, shift_days, DEMO_LOCATION_ID))
+                results["work_orders"] = cur.rowcount
 
-        return results
+                # asset_failure_predictions
+                cur.execute("""
+                    UPDATE asset_failure_predictions
+                    SET prediction_date = prediction_date + make_interval(days => %s)
+                    WHERE location_id = %s
+                """, (shift_days, DEMO_LOCATION_ID))
+                results["asset_failure_predictions"] = cur.rowcount
+
+                # pm_optimization_suggestions
+                cur.execute("""
+                    UPDATE pm_optimization_suggestions
+                    SET suggestion_date = suggestion_date + make_interval(days => %s)
+                    WHERE location_id = %s
+                """, (shift_days, DEMO_LOCATION_ID))
+                results["pm_optimization_suggestions"] = cur.rowcount
+
+                # maintenance_insights
+                cur.execute("""
+                    UPDATE maintenance_insights
+                    SET insight_date = insight_date + make_interval(days => %s)
+                    WHERE location_id = %s
+                """, (shift_days, DEMO_LOCATION_ID))
+                results["maintenance_insights"] = cur.rowcount
+
+                logger.info(f"Demo dates refreshed successfully: {results}")
+            else:
+                logger.info(f"Dates already current (max: {max_date}), skipping date updates")
+
+            # Recalculate KPIs from the updated work orders
+            try:
+                from .pipeline import run_pipeline
+                logger.info(f"Running pipeline to recalculate KPIs for location_id={DEMO_LOCATION_ID}")
+                pipeline_result = run_pipeline(verbose=False, location_id=DEMO_LOCATION_ID)
+                results["kpis_recalculated"] = True
+                results["pipeline"] = pipeline_result
+                logger.info(f"Pipeline completed: {pipeline_result}")
+            except Exception as pipeline_error:
+                logger.error(f"Pipeline failed after date refresh: {pipeline_error}", exc_info=True)
+                results["kpis_recalculated"] = False
+                results["pipeline_error"] = str(pipeline_error)
+
+            return results
     except Exception as e:
         logger.error(f"Failed to refresh demo dates: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
