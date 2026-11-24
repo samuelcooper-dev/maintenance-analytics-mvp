@@ -16,9 +16,14 @@ from datetime import datetime
 import pandas as pd
 
 # Handle imports for both script and module execution
+# Note: load_and_map_data is optional (not needed in demo mode)
 try:
-    # Try relative imports first (when run as module)
     from .load_and_map_data import load_and_prepare_data, DataLoadError
+except ImportError:
+    load_and_prepare_data = None
+    DataLoadError = Exception
+
+try:
     from .calculate_kpis import calculate_all, KPICalculationError
     from .kpi_storage import (
         create_kpi_tables,
@@ -39,34 +44,10 @@ try:
         store_maintenance_insights,
         PredictionStorageError
     )
-except ImportError:
-    # Fall back to absolute imports (when run as script)
-    try:
-        from .load_and_map_data import load_and_prepare_data, DataLoadError
-        from .calculate_kpis import calculate_all, KPICalculationError
-        from .kpi_storage import (
-            create_kpi_tables,
-            store_daily_kpis,
-            store_weekly_kpis,
-            store_monthly_kpis,
-            KPIStorageError
-        )
-        from .predictive_analytics import (
-            predict_asset_failures,
-            optimize_pm_schedules,
-            generate_maintenance_insights,
-            PredictiveAnalyticsError
-        )
-        from .prediction_storage import (
-            store_failure_predictions,
-            store_pm_optimization_suggestions,
-            store_maintenance_insights,
-            PredictionStorageError
-        )
-    except ImportError as e:
-        print(f"ERROR: Failed to import required modules: {e}")
-        print("Make sure all backend modules are in the same directory")
-        sys.exit(1)
+except ImportError as e:
+    print(f"ERROR: Failed to import required modules: {e}")
+    print("Make sure all backend modules are in the same directory")
+    sys.exit(1)
 
 class PipelineError(Exception):
     """Custom exception for pipeline execution errors."""
@@ -101,24 +82,29 @@ def log_step(step_name: str, status: str = "START", details: str = "") -> None:
 def load_data() -> pd.DataFrame:
     """
     Load and prepare work order data.
-    
+
     Returns:
         Cleaned DataFrame ready for KPI calculations
-        
+
     Raises:
         PipelineError: If data loading fails
     """
     log_step("LOAD DATA", "START")
-    
+
+    if load_and_prepare_data is None:
+        log_step("LOAD DATA", "INFO", "Data loading not available (demo mode)")
+        # Return empty DataFrame - pipeline will work with existing database data
+        return pd.DataFrame()
+
     try:
         df = load_and_prepare_data()
-        
+
         if df.empty:
             raise PipelineError("Loaded DataFrame is empty")
-        
+
         log_step("LOAD DATA", "SUCCESS", f"Loaded {len(df)} work orders")
         return df
-        
+
     except DataLoadError as e:
         log_step("LOAD DATA", "ERROR", str(e))
         raise PipelineError(f"Data loading failed: {str(e)}")
@@ -379,31 +365,35 @@ def run_pipeline(verbose: bool = True, location_id: Optional[int] = 1) -> dict:
     try:
         # Stage 1: Setup database
         setup_database()
-        
+
         # Stage 2: Load data
         df = load_data()
         results['work_orders_processed'] = len(df)
-        
-        # Stage 3: Calculate KPIs
-        kpi_results = calculate_kpis(df)
-        results['kpis_calculated'] = len(kpi_results)
-        results['distortions_detected'] = int(kpi_results['distortion_flag'].sum())
-        
-        # Stage 4: Categorize KPIs
-        daily_kpis, weekly_kpis, monthly_kpis = categorize_kpis(kpi_results)
-        
-        # Stage 5: Store KPIs
-        daily_rows, weekly_rows, monthly_rows = store_kpis(
-            daily_kpis, weekly_kpis, monthly_kpis
-        )
-        results['kpis_stored'] = daily_rows + weekly_rows + monthly_rows
 
-        # Stage 6: Generate and store predictions (NEW!)
-        pred_rows, sugg_rows, insight_rows = generate_and_store_predictions(df, location_id=location_id)
-        results['predictions_stored'] = pred_rows
-        results['suggestions_stored'] = sugg_rows
-        results['insights_stored'] = insight_rows
-        
+        # Only run KPI calculation and predictions if we have data
+        if not df.empty:
+            # Stage 3: Calculate KPIs
+            kpi_results = calculate_kpis(df)
+            results['kpis_calculated'] = len(kpi_results)
+            results['distortions_detected'] = int(kpi_results['distortion_flag'].sum())
+
+            # Stage 4: Categorize KPIs
+            daily_kpis, weekly_kpis, monthly_kpis = categorize_kpis(kpi_results)
+
+            # Stage 5: Store KPIs
+            daily_rows, weekly_rows, monthly_rows = store_kpis(
+                daily_kpis, weekly_kpis, monthly_kpis
+            )
+            results['kpis_stored'] = daily_rows + weekly_rows + monthly_rows
+
+            # Stage 6: Generate and store predictions
+            pred_rows, sugg_rows, insight_rows = generate_and_store_predictions(df, location_id=location_id)
+            results['predictions_stored'] = pred_rows
+            results['suggestions_stored'] = sugg_rows
+            results['insights_stored'] = insight_rows
+        else:
+            log_step("PIPELINE", "INFO", "No data to process (demo mode)")
+
         # Mark success
         results['success'] = True
         
